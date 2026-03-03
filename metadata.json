@@ -1,0 +1,5 @@
+{
+  "name": "CalendarSync",
+  "description": "A collaborative calendar application for scheduling group events.",
+  "requestFramePermissions": []
+}
