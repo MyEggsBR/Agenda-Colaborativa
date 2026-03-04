@@ -239,6 +239,17 @@ export default function VotePage() {
 
           {/* Main Calendar Area */}
           <section className="flex flex-col gap-6 lg:col-span-8">
+            {eventDetails.status === 'closed' && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200">
+                <div className="flex items-center gap-2 font-bold">
+                  <Lock className="h-5 w-5" />
+                  <h3>Votação Encerrada</h3>
+                </div>
+                <p className="mt-1 text-sm">
+                  O organizador encerrou a votação para este evento. Não é mais possível alterar sua disponibilidade.
+                </p>
+              </div>
+            )}
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-8">
               <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
                 <div>
@@ -287,10 +298,11 @@ export default function VotePage() {
                     <button
                       key={day.toISOString()}
                       onClick={() => toggleDate(day)}
-                      disabled={!isCurrentMonth}
+                      disabled={!isCurrentMonth || eventDetails.status === 'closed'}
                       className={cn(
                         "group relative h-14 w-full md:h-16",
-                        !isCurrentMonth && "opacity-0 pointer-events-none"
+                        !isCurrentMonth && "opacity-0 pointer-events-none",
+                        isCurrentMonth && eventDetails.status === 'closed' && "opacity-50 cursor-not-allowed"
                       )}
                     >
                       <div className={cn(
@@ -325,10 +337,10 @@ export default function VotePage() {
                 </button>
                 <button 
                   onClick={handleSave}
-                  disabled={isSaving}
-                  className="rounded-lg bg-blue-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all disabled:opacity-50"
+                  disabled={isSaving || eventDetails.status === 'closed'}
+                  className="rounded-lg bg-blue-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSaving ? 'Salvando...' : 'Salvar Disponibilidade'}
+                  {eventDetails.status === 'closed' ? 'Votação Encerrada' : (isSaving ? 'Salvando...' : 'Salvar Disponibilidade')}
                 </button>
               </div>
             </div>

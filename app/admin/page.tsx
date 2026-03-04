@@ -290,6 +290,29 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleFinalizeEvent = async () => {
+    if (!eventDetails) return;
+    
+    if (!confirm('Tem certeza que deseja finalizar a votação para este evento? Os participantes não poderão mais votar.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({ status: 'closed' })
+        .eq('id', eventDetails.id);
+
+      if (error) throw error;
+
+      setEventDetails({ ...eventDetails, status: 'closed' });
+      alert('Votação encerrada com sucesso!');
+    } catch (error) {
+      console.error('Error finalizing event:', error);
+      alert('Erro ao finalizar evento. Verifique se a coluna "status" existe na tabela "events".');
+    }
+  };
+
   const handleDeleteEvent = async (id: number) => {
     if (confirm('Tem certeza que deseja excluir este evento?')) {
       setIsLoading(true);
@@ -931,9 +954,13 @@ export default function AdminDashboard() {
                   <Share2 className="h-5 w-5" />
                   <span>Notificar Grupo</span>
                 </button>
-                <button className="flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/25 hover:bg-blue-700 transition-all">
+                <button 
+                  onClick={handleFinalizeEvent}
+                  disabled={eventDetails?.status === 'closed'}
+                  className="flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/25 hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   <CalendarCheck className="h-5 w-5" />
-                  <span>Finalizar Data</span>
+                  <span>{eventDetails?.status === 'closed' ? 'Votação Encerrada' : 'Finalizar Data'}</span>
                 </button>
               </div>
             </div>
