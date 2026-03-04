@@ -61,6 +61,25 @@ create policy "Enable insert for all users" on events for insert with check (tru
 create policy "Enable update for all users" on events for update using (true);
 create policy "Enable delete for all users" on events for delete using (true);
 
+-- 6. Criação da tabela de votos
+create table if not exists votes (
+  id bigint primary key generated always as identity,
+  event_id bigint references events(id) on delete cascade,
+  user_id bigint references participants(id) on delete cascade,
+  date date not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique(event_id, user_id, date)
+);
+
+-- Habilitar RLS para votos
+alter table votes enable row level security;
+
+-- Políticas para votos (Público para leitura/escrita - simplificado para demo)
+create policy "Enable read access for all users" on votes for select using (true);
+create policy "Enable insert for all users" on votes for insert with check (true);
+create policy "Enable update for all users" on votes for update using (true);
+create policy "Enable delete for all users" on votes for delete using (true);
+
 -- Inserir um evento padrão se não existir
 insert into events (title, description, location, start_date, end_date, status)
 select 'Churrasco de Confraternização', 'Vamos celebrar o fim de ano juntos!', 'Área de Lazer da Empresa', '2023-11-10', '2023-11-15', 'active'

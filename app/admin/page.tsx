@@ -136,11 +136,17 @@ export default function AdminDashboard() {
       setEventDetails(data[0]);
       
       // Fetch votes for this event
-      const { data: votes } = await supabase
+      const { data: votes, error: votesError } = await supabase
         .from('votes')
         .select('*')
         .eq('event_id', id);
-      setEventVotes(votes || []);
+      
+      if (votesError) {
+        console.warn('Error fetching votes (table might be missing):', votesError);
+        setEventVotes([]);
+      } else {
+        setEventVotes(votes || []);
+      }
     } else {
         console.warn(`No event found for ID ${id}`);
         setEventDetails(null);
@@ -560,6 +566,35 @@ export default function AdminDashboard() {
     );
   }
 
+  // Calculate statistics
+  const totalParticipants = participants.length;
+  const votingParticipants = new Set(eventVotes.map(v => v.user_id)).size;
+  
+  // Calculate date popularity
+  const dateCounts: Record<string, number> = {};
+  eventVotes.forEach(vote => {
+    const date = vote.date;
+    dateCounts[date] = (dateCounts[date] || 0) + 1;
+  });
+
+  // Find best date
+  let bestDate = '';
+  let maxVotes = 0;
+  Object.entries(dateCounts).forEach(([date, count]) => {
+    if (count > maxVotes) {
+      maxVotes = count;
+      bestDate = date;
+    }
+  });
+
+  // Sort dates by popularity
+  const sortedDates = Object.entries(dateCounts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5);
+
+  // Calculate consensus percentage
+  const consensus = totalParticipants > 0 ? Math.round((maxVotes / totalParticipants) * 100) : 0;
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans">
       {/* Header */}
@@ -874,7 +909,9 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Melhor Disponibilidade</p>
-                <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">Aguardando</p>
+                <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">
+                  {bestDate ? new Date(bestDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'Aguardando'}
+                </p>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -894,7 +931,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Consenso</p>
-                <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">N/A</p>
+                <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">{consensus}%</p>
               </div>
             </div>
 
@@ -907,8 +944,39 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between border-b border-slate-100 p-6 dark:border-slate-800">
                     <h3 className="text-lg font-bold">Mapa de Calor de Disponibilidade</h3>
                   </div>
-                  <div className="p-6 text-center text-slate-500">
-                    <p>Aguardando votos dos participantes para gerar o mapa de calor.</p>
+                  <div className="p-6">
+                    {Object.keys(dateCounts).length > 0 ? (
+                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                        {Object.entries(dateCounts)
+                          .sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime())
+                          .map(([date, count]) => {
+                            const percentage = totalParticipants > 0 ? count / totalParticipants : 0;
+                            let bgClass = "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400";
+                            if (percentage >= 1) bgClass = "bg-green-500 text-white";
+                            else if (percentage >= 0.75) bgClass = "bg-green-400 text-white";
+                            else if (percentage >= 0.5) bgClass = "bg-blue-400 text-white";
+                            else if (percentage >= 0.25) bgClass = "bg-blue-200 text-blue-800";
+
+                            return (
+                              <div key={date} className={cn("flex flex-col items-center justify-center rounded-lg p-3 text-center transition-all", bgClass)}>
+                                <span className="text-xs font-medium uppercase opacity-80">
+                                  {new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' })}
+                                </span>
+                                <span className="text-lg font-bold">
+                                  {new Date(date).getDate()}
+                                </span>
+                                <span className="mt-1 text-[10px] font-bold">
+                                  {count} / {totalParticipants}
+                                </span>
+                              </div>
+                            );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center text-slate-500">
+                        <p>Aguardando votos dos participantes para gerar o mapa de calor.</p>
+                      </div>
+                    )}
                   </div>
                 </section>
 
@@ -972,8 +1040,39 @@ export default function AdminDashboard() {
                     <BarChart3 className="h-5 w-5 text-blue-600" />
                     Melhores Datas
                   </h3>
-                  <div className="space-y-4 text-center text-slate-500 text-sm">
-                    <p>Aguardando votos para calcular as melhores datas.</p>
+                  <div className="space-y-4">
+                    {sortedDates.length > 0 ? (
+                      sortedDates.map(([date, count], index) => (
+                        <div key={date} className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold",
+                              index === 0 ? "bg-yellow-100 text-yellow-700" : 
+                              index === 1 ? "bg-slate-100 text-slate-700" : 
+                              "bg-orange-50 text-orange-700"
+                            )}>
+                              {index + 1}
+                            </div>
+                            <span className="font-medium text-slate-700 dark:text-slate-300">
+                              {new Date(date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                              <div 
+                                className="h-full bg-blue-600" 
+                                style={{ width: `${(count / totalParticipants) * 100}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{count}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center text-slate-500 text-sm">
+                        <p>Aguardando votos para calcular as melhores datas.</p>
+                      </div>
+                    )}
                   </div>
                 </section>
 

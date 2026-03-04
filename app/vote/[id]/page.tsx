@@ -136,7 +136,11 @@ export default function VotePage() {
       router.push('/');
     } catch (error: any) {
       console.error('Error saving votes:', error);
-      alert('Erro ao salvar: ' + error.message);
+      if (error.message?.includes('Could not find the table')) {
+        alert('Erro: A tabela de votos não existe. Por favor, contate o administrador para executar o script de configuração do banco de dados.');
+      } else {
+        alert('Erro ao salvar: ' + error.message);
+      }
     } finally {
       setIsSaving(false);
     }
