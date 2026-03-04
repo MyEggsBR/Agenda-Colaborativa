@@ -15,12 +15,14 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useSystemConfig } from '@/hooks/useSystemConfig';
 
 export default function EventsListPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { config, loading: configLoading } = useSystemConfig();
 
   useEffect(() => {
     const init = async () => {
@@ -54,7 +56,7 @@ export default function EventsListPage() {
     router.push('/login');
   };
 
-  if (isLoading) {
+  if (isLoading || configLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
@@ -67,10 +69,19 @@ export default function EventsListPage() {
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center gap-3 text-blue-600">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-900/20">
-            <Calendar className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-900/20 relative overflow-hidden">
+            {config.logo_url ? (
+              <Image 
+                src={`${config.logo_url}?t=${Date.now()}`} 
+                alt="Logo" 
+                fill 
+                className="object-contain p-1" 
+              />
+            ) : (
+              <Calendar className="h-6 w-6" />
+            )}
           </div>
-          <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">SyncUp</h1>
+          <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">{config.system_name}</h1>
         </div>
         <div className="flex items-center gap-6">
           <nav className="hidden md:flex items-center gap-8">

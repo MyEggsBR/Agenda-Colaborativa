@@ -639,7 +639,7 @@ export default function AdminDashboard() {
           <Link href="/" className="flex items-center gap-3 text-blue-600 hover:opacity-80 transition-opacity">
             {systemConfig.logo_url ? (
                <div className="relative h-8 w-8 overflow-hidden rounded-full">
-                 <Image src={systemConfig.logo_url} alt="Logo" fill className="object-cover" />
+                 <Image src={`${systemConfig.logo_url}?t=${Date.now()}`} alt="Logo" fill className="object-cover" />
                </div>
             ) : (
               <Calendar className="h-8 w-8" />

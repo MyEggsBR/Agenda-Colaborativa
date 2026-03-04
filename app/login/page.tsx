@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Calendar, UserCircle, Plus, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useSystemConfig } from '@/hooks/useSystemConfig';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [newUserName, setNewUserName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const { config, loading: configLoading } = useSystemConfig();
 
   useEffect(() => {
     const fetchParticipants = async () => {
@@ -55,7 +57,7 @@ export default function LoginPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || configLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
@@ -67,10 +69,19 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-slate-950 font-sans">
       <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-lg dark:bg-slate-900">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/20">
-            <Calendar className="h-6 w-6 text-blue-600" />
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/20 overflow-hidden relative">
+            {config.logo_url ? (
+              <Image 
+                src={`${config.logo_url}?t=${Date.now()}`} 
+                alt="Logo" 
+                fill 
+                className="object-contain p-2" 
+              />
+            ) : (
+              <Calendar className="h-10 w-10 text-blue-600" />
+            )}
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Bem-vindo ao SyncUp</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Bem-vindo ao {config.system_name}</h2>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Quem é você? Selecione seu nome para continuar.</p>
         </div>
 
