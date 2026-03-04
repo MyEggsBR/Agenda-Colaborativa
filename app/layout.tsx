@@ -2,7 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  title: 'SyncUp - Calendário Colaborativo',
+  title: 'Agenda de encontros Circulo Céu Azul',
   description: 'Encontre a melhor data para todos.',
 };
 

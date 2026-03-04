@@ -26,7 +26,9 @@ import {
   Cake,
   User,
   Upload,
-  LogOut
+  LogOut,
+  Settings,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -41,6 +43,18 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'participants'>('dashboard');
   const [view, setView] = useState<'list' | 'details' | 'create'>('list');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // System Config State
+  const [systemConfig, setSystemConfig] = useState({
+    system_name: 'Agenda de encontros Circulo Céu Azul',
+    logo_url: '',
+    primary_color: '#2563eb',
+    secondary_color: '#1e293b'
+  });
+
+  // Modals State
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [showNonRespondentsModal, setShowNonRespondentsModal] = useState(false);
   
   // Events Management State
   const [events, setEvents] = useState<any[]>([]);
@@ -90,8 +104,30 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchEvents();
+      fetchSystemConfig();
     }
   }, [isAuthenticated]);
+
+  const fetchSystemConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_config')
+        .select('*');
+      
+      if (data) {
+        const newConfig = { ...systemConfig };
+        data.forEach((item: any) => {
+          if (item.key in newConfig) {
+            // @ts-ignore
+            newConfig[item.key] = item.value;
+          }
+        });
+        setSystemConfig(newConfig);
+      }
+    } catch (error) {
+      console.error('Error fetching system config:', error);
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated && selectedEventId) {
@@ -601,8 +637,16 @@ export default function AdminDashboard() {
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 dark:border-slate-800 dark:bg-slate-900 md:px-10">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-3 text-blue-600 hover:opacity-80 transition-opacity">
-            <Calendar className="h-8 w-8" />
-            <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">Admin SyncUp</h2>
+            {systemConfig.logo_url ? (
+               <div className="relative h-8 w-8 overflow-hidden rounded-full">
+                 <Image src={systemConfig.logo_url} alt="Logo" fill className="object-cover" />
+               </div>
+            ) : (
+              <Calendar className="h-8 w-8" />
+            )}
+            <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">
+              {systemConfig.system_name}
+            </h2>
           </Link>
           {view === 'details' && (
             <nav className="hidden md:flex items-center gap-9">
@@ -633,6 +677,13 @@ export default function AdminDashboard() {
         </div>
         <div className="flex flex-1 items-center justify-end gap-4">
           <div className="flex gap-2">
+            <Link 
+              href="/admin/config"
+              className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
+              title="Configurações do Sistema"
+            >
+              <Settings className="h-5 w-5" />
+            </Link>
             <button className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors">
               <Bell className="h-5 w-5" />
             </button>
@@ -1080,6 +1131,17 @@ export default function AdminDashboard() {
                 <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                   <h3 className="mb-4 text-lg font-bold">Ações do Organizador</h3>
                   <div className="flex flex-col gap-3">
+                    <button 
+                      onClick={() => setShowResultModal(true)}
+                      className="flex w-full items-center justify-between rounded-lg bg-blue-600 px-4 py-3 text-sm font-bold text-white hover:bg-blue-700 shadow-lg shadow-blue-600/20 transition-all"
+                    >
+                      <span className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Gerar Resultado
+                      </span>
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+
                     <button                        onClick={async () => {
                         const currentRange = eventDetails?.date_display || '10-15 de Outubro';
                         const newRange = prompt('Digite o novo intervalo de datas (ex: 10-15 de Outubro):', currentRange);
@@ -1123,43 +1185,20 @@ export default function AdminDashboard() {
                       </span>
                       <ChevronRight className="h-4 w-4 text-slate-400" />
                     </button>
+                    
                     <button 
-                      onClick={() => {
-                        alert('Lembretes enviados com sucesso para os participantes pendentes via email/notificação.');
-                      }}
+                      onClick={() => setShowNonRespondentsModal(true)}
                       className="flex w-full items-center justify-between rounded-lg bg-slate-100 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors"
                     >
                       <span className="flex items-center gap-2">
-                        <Send className="h-4 w-4 text-slate-500" />
-                        Lembrar Quem Não Respondeu
+                        <Users className="h-4 w-4 text-slate-500" />
+                        Visualizar Quem Não Respondeu
                       </span>
-                      <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] text-white">{participants.length}</span>
-                    </button>
-                    <button 
-                      onClick={() => {
-                        const headers = ['ID', 'Nome', 'Cargo', 'Telefone', 'Aniversário'];
-                        const csvContent = [
-                          headers.join(','),
-                          ...participants.map(p => [p.id, p.name, p.role || '', p.phone || '', p.birthday || ''].join(','))
-                        ].join('\n');
-                        
-                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.setAttribute('href', url);
-                        link.setAttribute('download', 'participantes.csv');
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      }}
-                      className="flex w-full items-center justify-between rounded-lg bg-slate-100 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Download className="h-4 w-4 text-slate-500" />
-                        Exportar Dados (CSV)
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        {participants.length - new Set(eventVotes.map(v => v.user_id)).size}
                       </span>
-                      <ChevronRight className="h-4 w-4 text-slate-400" />
                     </button>
+
                     <button 
                       onClick={() => eventDetails && handleDeleteEvent(eventDetails.id)}
                       className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors"
@@ -1355,6 +1394,130 @@ export default function AdminDashboard() {
         )}
           </>
         )}
+      {/* Result Modal */}
+      {showResultModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+            <div className="relative bg-blue-600 p-8 text-center text-white">
+              <button 
+                onClick={() => setShowResultModal(false)}
+                className="absolute right-4 top-4 rounded-full bg-white/20 p-1 hover:bg-white/30"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white p-1 shadow-lg">
+                {systemConfig.logo_url ? (
+                  <div className="relative h-full w-full overflow-hidden rounded-full">
+                    <Image src={systemConfig.logo_url} alt="Logo" fill className="object-cover" />
+                  </div>
+                ) : (
+                  <Calendar className="h-10 w-10 text-blue-600" />
+                )}
+              </div>
+              
+              <h2 className="text-xl font-bold">{systemConfig.system_name}</h2>
+              <p className="text-blue-100">Resultado da Votação</p>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              <div className="text-center">
+                <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100">{eventDetails?.title}</h3>
+                <p className="text-slate-500">{eventDetails?.description}</p>
+              </div>
+              
+              <div className="space-y-4 rounded-xl bg-slate-50 p-4 dark:bg-slate-800">
+                <div className="flex items-center gap-3">
+                  <CalendarCheck className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="text-xs font-bold uppercase text-slate-500">Data Escolhida</p>
+                    <p className="font-bold text-slate-900 dark:text-slate-100">
+                      {bestDate ? new Date(bestDate + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Nenhuma data definida'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <Timer className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="text-xs font-bold uppercase text-slate-500">Horário</p>
+                    <p className="font-bold text-slate-900 dark:text-slate-100">
+                      A definir
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                    <div className="h-2 w-2 rounded-full bg-current" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase text-slate-500">Local</p>
+                    <p className="font-bold text-slate-900 dark:text-slate-100">
+                      {eventDetails?.location || 'Local não definido'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => window.print()}
+                className="w-full rounded-lg bg-slate-900 py-3 font-bold text-white hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600"
+              >
+                Imprimir / Salvar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Non-Respondents Modal */}
+      {showNonRespondentsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 p-4 dark:border-slate-800">
+              <h3 className="font-bold text-slate-900 dark:text-slate-100">Pendentes de Votação</h3>
+              <button 
+                onClick={() => setShowNonRespondentsModal(false)}
+                className="rounded-full p-1 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="max-h-[60vh] overflow-y-auto p-4">
+              {participants.filter(p => !eventVotes.some(v => v.user_id === p.id)).length > 0 ? (
+                <div className="space-y-3">
+                  {participants
+                    .filter(p => !eventVotes.some(v => v.user_id === p.id))
+                    .map(participant => (
+                      <div key={participant.id} className="flex items-center gap-3 rounded-lg border border-slate-100 p-3 dark:border-slate-800">
+                        <div className="relative h-10 w-10 overflow-hidden rounded-full bg-slate-200">
+                          <Image 
+                            src={participant.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(participant.name)}&background=random`} 
+                            alt={participant.name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 dark:text-slate-100">{participant.name}</p>
+                          <p className="text-xs text-slate-500">{participant.role || 'Participante'}</p>
+                        </div>
+                      </div>
+                    ))
+                  }
+                </div>
+              ) : (
+                <div className="py-8 text-center text-slate-500">
+                  <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-500" />
+                  <p>Todos os participantes já votaram!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       </main>
     </div>
   );

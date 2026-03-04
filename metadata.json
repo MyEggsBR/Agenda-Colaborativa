@@ -1,5 +1,9 @@
 {
-  "name": "CalendarSync",
-  "description": "A collaborative calendar application for scheduling group events.",
-  "requestFramePermissions": []
+  "name": "Agenda de encontros Circulo Céu Azul",
+  "description": "Encontre a melhor data para todos.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
 }
