@@ -910,7 +910,7 @@ export default function AdminDashboard() {
                 </div>
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Melhor Disponibilidade</p>
                 <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">
-                  {bestDate ? new Date(bestDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'Aguardando'}
+                  {bestDate ? new Date(bestDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'Aguardando'}
                 </p>
               </div>
 
@@ -960,10 +960,10 @@ export default function AdminDashboard() {
                             return (
                               <div key={date} className={cn("flex flex-col items-center justify-center rounded-lg p-3 text-center transition-all", bgClass)}>
                                 <span className="text-xs font-medium uppercase opacity-80">
-                                  {new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' })}
+                                  {new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short' })}
                                 </span>
                                 <span className="text-lg font-bold">
-                                  {new Date(date).getDate()}
+                                  {new Date(date + 'T12:00:00').getDate()}
                                 </span>
                                 <span className="mt-1 text-[10px] font-bold">
                                   {count} / {totalParticipants}
@@ -1054,7 +1054,7 @@ export default function AdminDashboard() {
                               {index + 1}
                             </div>
                             <span className="font-medium text-slate-700 dark:text-slate-300">
-                              {new Date(date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}
+                              {new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
