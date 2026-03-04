@@ -4,7 +4,7 @@ import http from 'http';
 const options = {
   hostname: 'localhost',
   port: 3000,
-  path: '/api/fix-db',
+  path: '/api/test-insert',
   method: 'GET'
 };
 

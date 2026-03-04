@@ -46,6 +46,7 @@ export default function AdminDashboard() {
   const [events, setEvents] = useState<any[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [eventDetails, setEventDetails] = useState<any>(null);
+  const [eventVotes, setEventVotes] = useState<any[]>([]);
 
   // Participants Management State
   const [participants, setParticipants] = useState<any[]>([]);
@@ -72,34 +73,15 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const checkSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          // If the refresh token is invalid, sign out to clear the bad state
-          if (error.message.includes('Refresh Token Not Found') || error.message.includes('Invalid Refresh Token')) {
-            console.warn('Invalid refresh token detected. Signing out...');
-            await supabase.auth.signOut();
-            setIsAuthenticated(false);
-          } else {
-            console.error('Error checking session:', error);
-          }
-        } else if (session) {
-          setIsAuthenticated(true);
-        }
-      } catch (err) {
-        console.error('Unexpected error checking session:', err);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsAuthenticated(true);
       }
     };
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-        setIsAuthenticated(false);
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        setIsAuthenticated(true);
-      } else if (event === 'INITIAL_SESSION') {
-         setIsAuthenticated(!!session);
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
     });
 
     return () => subscription.unsubscribe();
@@ -114,9 +96,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (isAuthenticated && selectedEventId) {
       loadEventDetails(selectedEventId);
-      if (activeTab === 'participants') {
-        fetchParticipants(selectedEventId);
-      }
+      // Always fetch all participants to calculate status
+      fetchParticipants();
     }
   }, [isAuthenticated, selectedEventId, activeTab]);
 
@@ -153,9 +134,17 @@ export default function AdminDashboard() {
           // alert(`Aviso: Existem ${data.length} eventos duplicados com este ID. Recomenda-se usar a função "Corrigir Duplicatas".`);
       }
       setEventDetails(data[0]);
+      
+      // Fetch votes for this event
+      const { data: votes } = await supabase
+        .from('votes')
+        .select('*')
+        .eq('event_id', id);
+      setEventVotes(votes || []);
     } else {
         console.warn(`No event found for ID ${id}`);
         setEventDetails(null);
+        setEventVotes([]);
     }
   };
 
@@ -164,18 +153,10 @@ export default function AdminDashboard() {
       setIsLoading(true);
       try {
           const response = await fetch('/api/fix-db');
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Server error: ${response.status} ${errorText}`);
-          }
-
           const result = await response.json();
-          console.log('Fix DB Result:', result);
           alert(result.message + '\n' + (result.logs || []).join('\n'));
           fetchEvents();
       } catch (e: any) {
-          console.error('Fix DB Error:', e);
           alert('Erro ao executar correção: ' + e.message);
       } finally {
           setIsLoading(false);
@@ -184,15 +165,14 @@ export default function AdminDashboard() {
 
   const fetchParticipants = async () => {
     setIsLoading(true);
-    // Fetch all participants as they are now global users
+    // Fetch all global participants
     const { data, error } = await supabase
       .from('participants')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('name');
     
     if (error) {
       console.error('Error fetching participants:', error);
-      alert('Erro ao buscar participantes: ' + error.message);
     } else {
       setParticipants(data || []);
     }
@@ -415,7 +395,7 @@ export default function AdminDashboard() {
         avatar_url: avatarUrl,
         phone: newParticipant.phone,
         birthday: newParticipant.birthday || null,
-        // event_id: selectedEventId // REMOVED: Users are global now
+        // event_id removed - participants are global
       };
 
       if (editingId) {
@@ -433,7 +413,7 @@ export default function AdminDashboard() {
         if (error) throw error;
       }
 
-      await fetchParticipants(selectedEventId || undefined);
+      await fetchParticipants();
       handleCancelEdit();
     } catch (error) {
       console.error('Error saving participant:', error);
@@ -468,7 +448,7 @@ export default function AdminDashboard() {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm('Tem certeza que deseja remover este usuário do sistema? Esta ação não pode ser desfeita.')) {
+    if (confirm('Tem certeza que deseja remover este participante?')) {
       setIsLoading(true);
       try {
         const { error } = await supabase
@@ -881,8 +861,10 @@ export default function AdminDashboard() {
                   </div>
                   <span className="rounded-full bg-green-500/10 px-2 py-1 text-xs font-bold text-green-500">Ativos</span>
                 </div>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Participantes</p>
-                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{participants.length}</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Votos Recebidos</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    {new Set(eventVotes.map(v => v.user_id)).size} / {participants.length}
+                </p>
               </div>
               
               <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -942,7 +924,9 @@ export default function AdminDashboard() {
                     </button>
                   </div>
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {participants.slice(0, 5).map((participant) => (
+                    {participants.slice(0, 5).map((participant) => {
+                      const hasVoted = eventVotes.some(v => v.user_id === participant.id);
+                      return (
                       <div key={participant.id} className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                         <div className="flex items-center gap-3">
                           <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-slate-200">
@@ -959,15 +943,18 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
-                          <span className="hidden text-xs font-medium text-slate-500 sm:inline-block">
-                            Aguardando resposta
-                          </span>
-                          <span className="rounded px-2 py-1 text-[10px] font-bold uppercase bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
-                            Pendente
+                          <span className={cn(
+                            "rounded px-2 py-1 text-[10px] font-bold uppercase",
+                            hasVoted 
+                                ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                                : "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+                          )}>
+                            {hasVoted ? 'Votou' : 'Pendente'}
                           </span>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                     {participants.length === 0 && (
                       <div className="p-8 text-center text-slate-500">
                         Nenhum participante cadastrado.
