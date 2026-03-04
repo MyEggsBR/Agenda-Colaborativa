@@ -72,15 +72,34 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setIsAuthenticated(true);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          // If the refresh token is invalid, sign out to clear the bad state
+          if (error.message.includes('Refresh Token Not Found') || error.message.includes('Invalid Refresh Token')) {
+            console.warn('Invalid refresh token detected. Signing out...');
+            await supabase.auth.signOut();
+            setIsAuthenticated(false);
+          } else {
+            console.error('Error checking session:', error);
+          }
+        } else if (session) {
+          setIsAuthenticated(true);
+        }
+      } catch (err) {
+        console.error('Unexpected error checking session:', err);
       }
     };
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        setIsAuthenticated(false);
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setIsAuthenticated(true);
+      } else if (event === 'INITIAL_SESSION') {
+         setIsAuthenticated(!!session);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -145,32 +164,35 @@ export default function AdminDashboard() {
       setIsLoading(true);
       try {
           const response = await fetch('/api/fix-db');
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Server error: ${response.status} ${errorText}`);
+          }
+
           const result = await response.json();
+          console.log('Fix DB Result:', result);
           alert(result.message + '\n' + (result.logs || []).join('\n'));
           fetchEvents();
       } catch (e: any) {
+          console.error('Fix DB Error:', e);
           alert('Erro ao executar correção: ' + e.message);
       } finally {
           setIsLoading(false);
       }
   };
 
-  const fetchParticipants = async (eventId?: number) => {
+  const fetchParticipants = async () => {
     setIsLoading(true);
-    // TODO: Filter by event_id when schema is updated
-    let query = supabase
+    // Fetch all participants as they are now global users
+    const { data, error } = await supabase
       .from('participants')
       .select('*')
       .order('created_at', { ascending: false });
-
-    if (eventId) {
-        query = query.eq('event_id', eventId);
-    }
-
-    const { data, error } = await query;
     
     if (error) {
       console.error('Error fetching participants:', error);
+      alert('Erro ao buscar participantes: ' + error.message);
     } else {
       setParticipants(data || []);
     }
@@ -393,7 +415,7 @@ export default function AdminDashboard() {
         avatar_url: avatarUrl,
         phone: newParticipant.phone,
         birthday: newParticipant.birthday || null,
-        event_id: selectedEventId // Link to current event
+        // event_id: selectedEventId // REMOVED: Users are global now
       };
 
       if (editingId) {
@@ -446,7 +468,7 @@ export default function AdminDashboard() {
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm('Tem certeza que deseja remover este participante?')) {
+    if (confirm('Tem certeza que deseja remover este usuário do sistema? Esta ação não pode ser desfeita.')) {
       setIsLoading(true);
       try {
         const { error } = await supabase
