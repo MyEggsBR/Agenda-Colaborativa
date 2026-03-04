@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
@@ -24,68 +24,31 @@ import {
   Plus,
   Phone,
   Cake,
-  User
+  User,
+  Upload,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 
-// Mock Data for Admin Dashboard Metrics
-const RECENT_RESPONSES = [
-  { 
-    id: 1, 
-    name: 'Alex Johnson', 
-    role: 'Líder de Design', 
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCLmdpgHTOrHKXrtbwHDuQh7pCo5VXlF87aJH1Ehh8fFRxdhucvR3KJgHrsWJIUWLYFU5OiKqN8gTkQhTOdNYFLc-vTre86V1D8maFafFskB2Y_NHrsffrYV3KZfjrSWyXcOiURmyjRYfCHEgacbpEJaYVZdzuX3fsn72cRMpmyhDkXA-sgRaUPJXKBXMKJMSRA3U_dREUfh8TtRUte825d1Yf1KSqBza2zkQbNeIF0NFtm4_I55BgzVsnSrCXpTYXdq0XH2qIN_Ag9',
-    dates: 'Oct 10, 12, 14',
-    status: 'Enviado'
-  },
-  { 
-    id: 2, 
-    name: 'Sarah Chen', 
-    role: 'Gerente de Produto', 
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD72BXxtwjojBgM4QWwHC_THpMZzC3UV7d7W1bYojpO30dwJQYWYcGuPqakjBbzwU_0-Vurz_fP6vY6gAZMxX8XdZEYNZOgcpfc8vljrs9aErGokbzxwfEAq0h8VniYhCyf_yXd2OlR_IgQX2QrADeXceb-F335anLYjNe7AY_O_N8novoeILJM2Z1QKjLaAx9ESPZzkrFxWnSs0eFf4o3dXWy7X4Xe_3L0pWzgKLO7Dx_4eCgNi_b7JbBuix0j-QAWE47bQGla0zwt',
-    dates: 'Oct 12, 13',
-    status: 'Enviado'
-  },
-  { 
-    id: 3, 
-    name: 'Marcus Wright', 
-    role: 'CTO', 
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAst3G5YTjMrKzMeI3roXZ-5-kS0ZIErOuUl3UR-4qqg3-OkrGCM_jciirq_vzqclq3ESBUdht2vKPFLWh-6rYFYxdmY9--PMvd3FQtRo8DzPHhso9HMMsN1bnmYrDXx4IdhGETA8DPUFI-bDJIT35A0boqso3N-Wh3Aq8Qs66TJeB1k-WE8KAk1gkLF9mSJx7u0FStmoGrg-WRhpmxpmiA31pwf6cq4ZHBtWL0s1QfwSdUh2c9i-1vgUooglLJQVtupLDsxh59R_jj',
-    dates: 'Precisa de mais informações',
-    status: 'Pendente'
-  },
-];
+// Mock Data removed
 
-const BEST_DATES = [
-  { date: '12 de Outubro', score: '10/12', percentage: 83, label: 'Maior Consenso' },
-  { date: '10 de Outubro', score: '8/12', percentage: 66, label: null },
-  { date: '09 de Outubro', score: '7/12', percentage: 58, label: null },
-];
 
 export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'participants'>('dashboard');
+  const [view, setView] = useState<'list' | 'details' | 'create'>('list');
+  const [isLoading, setIsLoading] = useState(false);
   
+  // Events Management State
+  const [events, setEvents] = useState<any[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [eventDetails, setEventDetails] = useState<any>(null);
+
   // Participants Management State
-  const [participants, setParticipants] = useState([
-    { 
-      id: 1, 
-      name: 'Alex Johnson', 
-      role: 'Líder de Design', 
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCLmdpgHTOrHKXrtbwHDuQh7pCo5VXlF87aJH1Ehh8fFRxdhucvR3KJgHrsWJIUWLYFU5OiKqN8gTkQhTOdNYFLc-vTre86V1D8maFafFskB2Y_NHrsffrYV3KZfjrSWyXcOiURmyjRYfCHEgacbpEJaYVZdzuX3fsn72cRMpmyhDkXA-sgRaUPJXKBXMKJMSRA3U_dREUfh8TtRUte825d1Yf1KSqBza2zkQbNeIF0NFtm4_I55BgzVsnSrCXpTYXdq0XH2qIN_Ag9',
-      phone: '(11) 99876-5432',
-      birthday: '1990-05-15'
-    },
-    { 
-      id: 2, 
-      name: 'Sarah Chen', 
-      role: 'Gerente de Produto', 
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD72BXxtwjojBgM4QWwHC_THpMZzC3UV7d7W1bYojpO30dwJQYWYcGuPqakjBbzwU_0-Vurz_fP6vY6gAZMxX8XdZEYNZOgcpfc8vljrs9aErGokbzxwfEAq0h8VniYhCyf_yXd2OlR_IgQX2QrADeXceb-F335anLYjNe7AY_O_N8novoeILJM2Z1QKjLaAx9ESPZzkrFxWnSs0eFf4o3dXWy7X4Xe_3L0pWzgKLO7Dx_4eCgNi_b7JbBuix0j-QAWE47bQGla0zwt',
-      phone: '(11) 98765-4321',
-      birthday: '1992-08-22'
-    },
-  ]);
+  const [participants, setParticipants] = useState<any[]>([]);
 
   const [newParticipant, setNewParticipant] = useState({
     name: '',
@@ -95,57 +58,379 @@ export default function AdminDashboard() {
     birthday: ''
   });
 
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    description: '',
+    location: '',
+    start_date: '',
+    end_date: '',
+    date_display: ''
+  });
+
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === 'admin') {
-      setIsAuthenticated(true);
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsAuthenticated(true);
+      }
+    };
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchEvents();
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated && selectedEventId) {
+      loadEventDetails(selectedEventId);
+      if (activeTab === 'participants') {
+        fetchParticipants(selectedEventId);
+      }
+    }
+  }, [isAuthenticated, selectedEventId, activeTab]);
+
+  const fetchEvents = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching events:', error);
     } else {
-      alert('Senha incorreta. Tente "admin".');
+      setEvents(data || []);
+    }
+    setIsLoading(false);
+  };
+
+  const loadEventDetails = async (id: number) => {
+    console.log(`Loading details for event ${id} (v3)...`);
+    // Use select() without single() to handle potential duplicates gracefully
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error loading event details (v3):', error);
+      // alert(`Erro ao carregar detalhes: ${error.message}`);
+    } else if (data && data.length > 0) {
+      // If multiple rows returned, just take the first one and warn
+      if (data.length > 1) {
+          console.warn(`Duplicate events found for ID ${id}. Using the first one.`);
+          // alert(`Aviso: Existem ${data.length} eventos duplicados com este ID. Recomenda-se usar a função "Corrigir Duplicatas".`);
+      }
+      setEventDetails(data[0]);
+    } else {
+        console.warn(`No event found for ID ${id}`);
+        setEventDetails(null);
     }
   };
 
-  const handleAddParticipant = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newParticipant.name) return;
+  const runDuplicateFix = async () => {
+      if (!confirm('Isso irá buscar e remover eventos duplicados no banco de dados. Deseja continuar?')) return;
+      setIsLoading(true);
+      try {
+          const response = await fetch('/api/fix-db');
+          const result = await response.json();
+          alert(result.message + '\n' + (result.logs || []).join('\n'));
+          fetchEvents();
+      } catch (e: any) {
+          alert('Erro ao executar correção: ' + e.message);
+      } finally {
+          setIsLoading(false);
+      }
+  };
 
-    if (editingId) {
-      setParticipants(participants.map(p => 
-        p.id === editingId 
-          ? { ...p, ...newParticipant, avatar: newParticipant.avatar || p.avatar }
-          : p
-      ));
-      setEditingId(null);
-    } else {
-      setParticipants([
-        ...participants,
-        {
-          id: Date.now(),
-          ...newParticipant,
-          avatar: newParticipant.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(newParticipant.name)}&background=random`
-        }
-      ]);
+  const fetchParticipants = async (eventId?: number) => {
+    setIsLoading(true);
+    // TODO: Filter by event_id when schema is updated
+    let query = supabase
+      .from('participants')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (eventId) {
+        query = query.eq('event_id', eventId);
     }
 
-    setNewParticipant({
-      name: '',
-      role: '',
-      avatar: '',
-      phone: '',
-      birthday: ''
-    });
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Error fetching participants:', error);
+    } else {
+      setParticipants(data || []);
+    }
+    setIsLoading(false);
+  };
+
+  const handleCreateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .insert([{
+          ...newEvent,
+          status: 'active'
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      alert('Evento criado com sucesso!');
+      setNewEvent({
+        title: '',
+        description: '',
+        location: '',
+        start_date: '',
+        end_date: '',
+        date_display: ''
+      });
+      setView('list');
+      setSelectedEventId(null); // Ensure selectedEventId is cleared
+      fetchEvents();
+    } catch (error: any) {
+      console.error('Error creating event:', error);
+      alert('Erro ao criar evento: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForceDelete = async (id: number) => {
+    if (!confirm('ATENÇÃO: Isso tentará forçar a exclusão do evento ignorando verificações normais. Use apenas se a exclusão normal falhar. Continuar?')) return;
+    
+    setIsLoading(true);
+    try {
+        // 1. Try deleting participants first manually
+        await supabase.from('participants').delete().eq('event_id', id);
+        
+        // 2. Try deleting from other tables
+        await supabase.from('votes').delete().eq('event_id', id);
+        await supabase.from('availabilities').delete().eq('event_id', id);
+        await supabase.from('event_availability').delete().eq('event_id', id);
+
+        // 3. Delete the event
+        const { error } = await supabase.from('events').delete().eq('id', id);
+        
+        if (error) {
+            throw error;
+        }
+
+        alert('Evento excluído forçadamente com sucesso!');
+        setEvents(events.filter(e => e.id !== id));
+        if (selectedEventId === id) {
+            setSelectedEventId(null);
+            setView('list');
+        }
+    } catch (error: any) {
+        console.error('Force delete failed:', error);
+        alert(`Falha na exclusão forçada: ${error.message}`);
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  const handleDeleteEvent = async (id: number) => {
+    if (confirm('Tem certeza que deseja excluir este evento?')) {
+      setIsLoading(true);
+      console.log('Starting deletion for event:', id);
+      try {
+        // 1. Try to use the RPC function first (if the user ran the SQL script)
+        const { error: rpcError } = await supabase.rpc('delete_event_cascade', { target_event_id: id });
+        
+        if (!rpcError) {
+          console.log('RPC deletion successful');
+          setEvents(events.filter(e => e.id !== id));
+          if (selectedEventId === id) {
+              setSelectedEventId(null);
+              setView('list');
+          }
+          alert('Evento excluído com sucesso!');
+          return;
+        }
+
+        console.warn('RPC delete_event_cascade failed or not found, falling back to manual deletion:', rpcError);
+
+        // 2. Fallback: Manual deletion logic
+        
+        // Speculatively try to delete from other potential tables to avoid FK constraints
+        try { await supabase.from('votes').delete().eq('event_id', id); } catch {}
+        try { await supabase.from('availabilities').delete().eq('event_id', id); } catch {}
+        try { await supabase.from('event_availability').delete().eq('event_id', id); } catch {}
+
+        // Manually delete participants first to ensure no foreign key issues
+        const { error: participantsError } = await supabase
+          .from('participants')
+          .delete()
+          .eq('event_id', id);
+        
+        if (participantsError) {
+             console.error('Error deleting participants:', participantsError);
+             // If the error is about column not found, maybe event_id doesn't exist, so we proceed to delete event
+             if (participantsError.code !== '42703') { // 42703 is undefined_column
+                 alert(`Erro ao excluir participantes: ${participantsError.message} (Código: ${participantsError.code})`);
+                 throw participantsError;
+             }
+        }
+
+        const { error } = await supabase
+          .from('events')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+            console.error('Error deleting event:', error);
+            alert(`Erro ao excluir evento: ${error.message} (Código: ${error.code})\nDetalhes: ${error.details || 'Nenhum detalhe disponível'}`);
+            throw error;
+        }
+        
+        console.log('Manual deletion successful');
+        setEvents(events.filter(e => e.id !== id));
+        if (selectedEventId === id) {
+            setSelectedEventId(null);
+            setView('list');
+        }
+        alert('Evento excluído com sucesso!');
+      } catch (error: any) {
+        console.error('Error deleting event:', error);
+        // Alert is already handled above for specific errors
+        if (!error.message) {
+            alert('Erro desconhecido ao excluir evento. Verifique o console para mais detalhes.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleSelectEvent = (id: number) => {
+    setSelectedEventId(id);
+    setView('details');
+    setActiveTab('dashboard');
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      alert('Erro ao fazer login: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsAuthenticated(false);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setAvatarFile(e.target.files[0]);
+    }
+  };
+
+  const uploadAvatar = async (file: File) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const handleAddParticipant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newParticipant.name) return;
+    setIsLoading(true);
+
+    try {
+      let avatarUrl = newParticipant.avatar;
+
+      if (avatarFile) {
+        avatarUrl = await uploadAvatar(avatarFile);
+      } else if (!avatarUrl) {
+        avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(newParticipant.name)}&background=random`;
+      }
+
+      const participantData = {
+        name: newParticipant.name,
+        role: newParticipant.role,
+        avatar_url: avatarUrl,
+        phone: newParticipant.phone,
+        birthday: newParticipant.birthday || null,
+        event_id: selectedEventId // Link to current event
+      };
+
+      if (editingId) {
+        const { error } = await supabase
+          .from('participants')
+          .update(participantData)
+          .eq('id', editingId);
+        
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('participants')
+          .insert([participantData]);
+        
+        if (error) throw error;
+      }
+
+      await fetchParticipants(selectedEventId || undefined);
+      handleCancelEdit();
+    } catch (error) {
+      console.error('Error saving participant:', error);
+      alert('Erro ao salvar participante.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleEdit = (participant: any) => {
     setEditingId(participant.id);
     setNewParticipant({
       name: participant.name,
-      role: participant.role,
-      avatar: participant.avatar,
+      role: participant.role || '',
+      avatar: participant.avatar_url || '',
       phone: participant.phone || '',
       birthday: participant.birthday || ''
     });
+    setAvatarFile(null);
   };
 
   const handleCancelEdit = () => {
@@ -157,13 +442,65 @@ export default function AdminDashboard() {
       phone: '',
       birthday: ''
     });
+    setAvatarFile(null);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Tem certeza que deseja remover este participante?')) {
-      setParticipants(participants.filter(p => p.id !== id));
-      if (editingId === id) {
-        handleCancelEdit();
+      setIsLoading(true);
+      try {
+        const { error } = await supabase
+          .from('participants')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        
+        setParticipants(participants.filter(p => p.id !== id));
+        if (editingId === id) {
+          handleCancelEdit();
+        }
+      } catch (error) {
+        console.error('Error deleting participant:', error);
+        alert('Erro ao remover participante.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleCancelEvent = async () => {
+    if (confirm('Tem certeza que deseja cancelar este evento? Esta ação removerá todos os dados e não pode ser desfeita.')) {
+      setIsLoading(true);
+      try {
+        // Update event status to cancelled
+        if (eventDetails) {
+            const { error: updateError } = await supabase
+            .from('events')
+            .update({ status: 'cancelled' })
+            .eq('id', eventDetails.id);
+
+            if (updateError) throw updateError;
+        }
+
+        // Delete participants for this event
+        if (eventDetails) {
+            const { error } = await supabase
+              .from('participants')
+              .delete()
+              .eq('event_id', eventDetails.id);
+
+            if (error) throw error;
+        }
+        
+        setParticipants([]);
+        alert('Evento cancelado com sucesso.');
+        window.location.href = '/';
+      } catch (error) {
+        console.error('Error cancelling event:', error);
+        alert('Erro ao cancelar evento.');
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -181,6 +518,20 @@ export default function AdminDashboard() {
           </div>
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                placeholder="admin@example.com"
+              />
+            </div>
+            <div>
               <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                 Senha
               </label>
@@ -196,9 +547,10 @@ export default function AdminDashboard() {
             </div>
             <button
               type="submit"
-              className="flex w-full justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              disabled={isLoading}
+              className="flex w-full justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
             >
-              Entrar
+              {isLoading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
         </div>
@@ -215,35 +567,44 @@ export default function AdminDashboard() {
             <Calendar className="h-8 w-8" />
             <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">Admin SyncUp</h2>
           </Link>
-          <nav className="hidden md:flex items-center gap-9">
-            <button 
-              onClick={() => setActiveTab('dashboard')}
-              className={cn(
-                "pb-1 text-sm font-semibold transition-colors",
-                activeTab === 'dashboard' 
-                  ? "border-b-2 border-blue-600 text-slate-900 dark:text-slate-100" 
-                  : "text-slate-600 hover:text-blue-600 dark:text-slate-400"
-              )}
-            >
-              Painel
-            </button>
-            <button 
-              onClick={() => setActiveTab('participants')}
-              className={cn(
-                "pb-1 text-sm font-semibold transition-colors",
-                activeTab === 'participants' 
-                  ? "border-b-2 border-blue-600 text-slate-900 dark:text-slate-100" 
-                  : "text-slate-600 hover:text-blue-600 dark:text-slate-400"
-              )}
-            >
-              Participantes
-            </button>
-          </nav>
+          {view === 'details' && (
+            <nav className="hidden md:flex items-center gap-9">
+              <button 
+                onClick={() => setActiveTab('dashboard')}
+                className={cn(
+                  "pb-1 text-sm font-semibold transition-colors",
+                  activeTab === 'dashboard' 
+                    ? "border-b-2 border-blue-600 text-slate-900 dark:text-slate-100" 
+                    : "text-slate-600 hover:text-blue-600 dark:text-slate-400"
+                )}
+              >
+                Painel
+              </button>
+              <button 
+                onClick={() => setActiveTab('participants')}
+                className={cn(
+                  "pb-1 text-sm font-semibold transition-colors",
+                  activeTab === 'participants' 
+                    ? "border-b-2 border-blue-600 text-slate-900 dark:text-slate-100" 
+                    : "text-slate-600 hover:text-blue-600 dark:text-slate-400"
+                )}
+              >
+                Participantes
+              </button>
+            </nav>
+          )}
         </div>
         <div className="flex flex-1 items-center justify-end gap-4">
           <div className="flex gap-2">
             <button className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors">
               <Bell className="h-5 w-5" />
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"
+              title="Sair"
+            >
+              <LogOut className="h-5 w-5" />
             </button>
             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-900/20">
               <div className="relative h-full w-full">
@@ -260,7 +621,211 @@ export default function AdminDashboard() {
       </header>
 
       <main className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col px-4 py-8 md:px-10">
-        {activeTab === 'dashboard' ? (
+        {view === 'list' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Meus Eventos</h1>
+              <div className="flex gap-2">
+                  <button 
+                    onClick={runDuplicateFix}
+                    className="flex items-center gap-2 rounded-lg bg-yellow-500 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-600 transition-colors"
+                    title="Corrigir Duplicatas"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Corrigir DB
+                  </button>
+                  <button 
+                    onClick={() => setView('create')}
+                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Criar Evento
+                  </button>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                    <tr>
+                      <th className="px-6 py-4 font-bold">Evento</th>
+                      <th className="px-6 py-4 font-bold">Datas</th>
+                      <th className="px-6 py-4 font-bold">Status</th>
+                      <th className="px-6 py-4 font-bold text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {events.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                          Nenhum evento encontrado. Crie um novo evento para começar.
+                        </td>
+                      </tr>
+                    ) : (
+                      events.map((event) => (
+                        <tr key={event.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                          <td className="px-6 py-4">
+                            <button 
+                              onClick={() => handleSelectEvent(event.id)}
+                              className="font-bold text-slate-900 hover:text-blue-600 dark:text-slate-100 dark:hover:text-blue-400"
+                            >
+                              {event.title}
+                            </button>
+                            {event.description && (
+                              <p className="mt-1 max-w-md truncate text-xs text-slate-500">{event.description}</p>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
+                            {event.date_display || 'Datas não definidas'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={cn(
+                              "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                              event.status === 'cancelled' 
+                                ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                : event.status === 'completed'
+                                ? "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400"
+                                : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                            )}>
+                              {event.status === 'cancelled' ? 'Cancelado' : event.status === 'completed' ? 'Concluído' : 'Ativo'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button 
+                                onClick={() => handleSelectEvent(event.id)}
+                                className="rounded p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+                                title="Ver Detalhes"
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteEvent(event.id)}
+                                className="rounded p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                                title="Excluir Evento"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {view === 'create' && (
+          <div className="mx-auto w-full max-w-2xl">
+            <button 
+              onClick={() => setView('list')}
+              className="mb-6 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Voltar para lista
+            </button>
+            
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <h2 className="mb-6 text-xl font-bold text-slate-900 dark:text-slate-100">Criar Novo Evento</h2>
+              <form onSubmit={handleCreateEvent} className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Título do Evento</label>
+                  <input 
+                    type="text"
+                    required
+                    value={newEvent.title}
+                    onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                    placeholder="Ex: Reunião de Planejamento"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Descrição</label>
+                  <textarea 
+                    rows={3}
+                    value={newEvent.description}
+                    onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                    placeholder="Detalhes sobre o evento..."
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Localização</label>
+                  <input 
+                    type="text"
+                    value={newEvent.location}
+                    onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                    placeholder="Ex: Sala de Reuniões A ou Google Meet"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Data de Início</label>
+                    <input 
+                      type="date"
+                      value={newEvent.start_date}
+                      onChange={(e) => setNewEvent({...newEvent, start_date: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Data de Término</label>
+                    <input 
+                      type="date"
+                      value={newEvent.end_date}
+                      onChange={(e) => setNewEvent({...newEvent, end_date: e.target.value})}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Exibição de Datas (Texto)</label>
+                  <input 
+                    type="text"
+                    value={newEvent.date_display}
+                    onChange={(e) => setNewEvent({...newEvent, date_display: e.target.value})}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                    placeholder="Ex: 10-15 de Outubro"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">Este texto será exibido no cabeçalho do evento.</p>
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setView('list')}
+                    className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={isLoading}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {isLoading ? 'Criando...' : 'Criar Evento'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {view === 'details' && (
+          <>
+            <button 
+              onClick={() => setView('list')}
+              className="mb-6 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Voltar para lista de eventos
+            </button>
+            
+            {activeTab === 'dashboard' ? (
           <>
             {/* Dashboard Hero */}
             <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -268,8 +833,10 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-blue-600">
                   <BarChart3 className="h-4 w-4" /> Análise do Evento
                 </div>
-                <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900 dark:text-slate-100">Estratégia de Revisão Trimestral</h1>
-                <p className="text-base font-normal text-slate-500 dark:text-slate-400">Organizado pelo Time de Produto • 12 participantes • 10/12 responderam (83%)</p>
+                <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-900 dark:text-slate-100">{eventDetails?.title || 'Carregando...'}</h1>
+                <p className="text-base font-normal text-slate-500 dark:text-slate-400">
+                    {eventDetails?.description || 'Sem descrição'} • {participants.length} participantes
+                </p>
               </div>
               <div className="flex gap-3">
                 <button className="flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-4 text-sm font-bold text-slate-900 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors">
@@ -290,10 +857,10 @@ export default function AdminDashboard() {
                   <div className="rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-900/20">
                     <Users className="h-6 w-6" />
                   </div>
-                  <span className="rounded-full bg-green-500/10 px-2 py-1 text-xs font-bold text-green-500">+2 novos</span>
+                  <span className="rounded-full bg-green-500/10 px-2 py-1 text-xs font-bold text-green-500">Ativos</span>
                 </div>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Respostas</p>
-                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">10 / 12</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Participantes</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{participants.length}</p>
               </div>
               
               <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -303,7 +870,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Melhor Disponibilidade</p>
-                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">12 de Out</p>
+                <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">Aguardando</p>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -312,8 +879,8 @@ export default function AdminDashboard() {
                     <Timer className="h-6 w-6" />
                   </div>
                 </div>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Tempo Médio de Conclusão</p>
-                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">1.4 min</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Tempo Médio</p>
+                <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">N/A</p>
               </div>
 
               <div className="rounded-xl border border-slate-200 border-l-4 border-l-blue-600 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -322,8 +889,8 @@ export default function AdminDashboard() {
                     <CheckCircle2 className="h-6 w-6" />
                   </div>
                 </div>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Pontuação de Consenso</p>
-                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">Alta (88%)</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Consenso</p>
+                <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">N/A</p>
               </div>
             </div>
 
@@ -335,115 +902,55 @@ export default function AdminDashboard() {
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between border-b border-slate-100 p-6 dark:border-slate-800">
                     <h3 className="text-lg font-bold">Mapa de Calor de Disponibilidade</h3>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-3 w-3 rounded-sm bg-blue-100 dark:bg-blue-900/20"></div>
-                        <span className="text-[10px] font-bold uppercase text-slate-500">Baixo</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-3 w-3 rounded-sm bg-blue-400"></div>
-                        <span className="text-[10px] font-bold uppercase text-slate-500">Méd</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-3 w-3 rounded-sm bg-blue-600"></div>
-                        <span className="text-[10px] font-bold uppercase text-slate-500">Alto</span>
-                      </div>
-                    </div>
                   </div>
-                  <div className="p-6">
-                    <div className="mb-6 flex items-center justify-between">
-                      <button className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                        <ChevronLeft className="h-5 w-5" />
-                      </button>
-                      <span className="text-base font-bold">Outubro 2023</span>
-                      <button className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                        <ChevronRight className="h-5 w-5" />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-7 gap-2">
-                      {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                        <div key={day} className="py-2 text-center text-xs font-bold uppercase text-slate-400">{day}</div>
-                      ))}
-                      
-                      {/* Mock Calendar Grid for Heatmap */}
-                      {/* Previous month days */}
-                      {[24, 25, 26, 27, 28, 29, 30].map(d => (
-                        <div key={`prev-${d}`} className="flex h-14 items-start justify-end rounded-lg border border-slate-50 bg-slate-50/50 p-2 text-slate-300 dark:border-slate-800 dark:bg-slate-800/30 md:h-20">{d}</div>
-                      ))}
-                      
-                      {/* Current month days */}
-                      {[1, 2, 3, 4].map(d => (
-                        <div key={d} className="flex h-14 flex-col items-center justify-center rounded-lg border border-slate-200 bg-white p-2 font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 md:h-20">{d}</div>
-                      ))}
-
-                      {/* Heatmap days */}
-                      <div className="flex h-14 flex-col items-center justify-center rounded-lg border border-blue-200 bg-blue-50 p-2 font-bold text-blue-600 dark:border-blue-900/30 dark:bg-blue-900/20 md:h-20">
-                        5 <span className="mt-1 text-[9px] text-blue-600/70">2/12</span>
-                      </div>
-                      <div className="flex h-14 flex-col items-center justify-center rounded-lg border border-blue-300 bg-blue-100 p-2 font-bold text-blue-700 dark:border-blue-800/50 dark:bg-blue-800/30 md:h-20">
-                        6 <span className="mt-1 text-[9px] text-blue-700/70">4/12</span>
-                      </div>
-                      <div className="flex h-14 flex-col items-center justify-center rounded-lg border border-blue-400 bg-blue-200 p-2 font-bold text-blue-800 dark:border-blue-700/50 dark:bg-blue-700/30 md:h-20">
-                        7 <span className="mt-1 text-[9px] text-blue-800/80">6/12</span>
-                      </div>
-                      <div className="flex h-14 flex-col items-center justify-center rounded-lg border border-blue-400 bg-blue-200 p-2 font-bold text-blue-800 dark:border-blue-700/50 dark:bg-blue-700/30 md:h-20">
-                        8 <span className="mt-1 text-[9px] text-blue-800/80">6/12</span>
-                      </div>
-                      <div className="flex h-14 flex-col items-center justify-center rounded-lg border border-blue-500 bg-blue-500 p-2 font-bold text-white md:h-20">
-                        9 <span className="mt-1 text-[9px] text-white/80">7/12</span>
-                      </div>
-                      <div className="flex h-14 flex-col items-center justify-center rounded-lg border border-blue-600 bg-blue-600 p-2 font-bold text-white md:h-20">
-                        10 <span className="mt-1 text-[9px] text-white/90">8/12</span>
-                      </div>
-                      <div className="flex h-14 flex-col items-center justify-center rounded-lg border-2 border-blue-600 bg-blue-600 p-2 font-bold text-white ring-2 ring-blue-600 ring-offset-2 dark:ring-offset-slate-900 md:h-20">
-                        12 <span className="mt-1 text-[9px] text-white">10/12</span>
-                      </div>
-
-                      {[13, 14, 15].map(d => (
-                        <div key={d} className="flex h-14 flex-col items-center justify-center rounded-lg border border-slate-200 bg-white p-2 font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 md:h-20">{d}</div>
-                      ))}
-                    </div>
+                  <div className="p-6 text-center text-slate-500">
+                    <p>Aguardando votos dos participantes para gerar o mapa de calor.</p>
                   </div>
                 </section>
 
                 {/* Responses List */}
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center justify-between border-b border-slate-100 p-6 dark:border-slate-800">
-                    <h3 className="text-lg font-bold">Respostas Recentes</h3>
-                    <button className="text-sm font-bold text-blue-600 hover:underline">Ver Tudo</button>
+                    <h3 className="text-lg font-bold">Participantes ({participants.length})</h3>
+                    <button 
+                      onClick={() => setActiveTab('participants')}
+                      className="text-sm font-bold text-blue-600 hover:underline"
+                    >
+                      Ver Todos
+                    </button>
                   </div>
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {RECENT_RESPONSES.map((response) => (
-                      <div key={response.id} className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    {participants.slice(0, 5).map((participant) => (
+                      <div key={participant.id} className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                         <div className="flex items-center gap-3">
                           <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-slate-200">
                             <Image 
-                              src={response.avatar} 
-                              alt={response.name}
+                              src={participant.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(participant.name)}&background=random`} 
+                              alt={participant.name}
                               fill
                               className="object-cover"
                             />
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{response.name}</p>
-                            <p className="text-xs text-slate-500">{response.role}</p>
+                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{participant.name}</p>
+                            <p className="text-xs text-slate-500">{participant.role}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="hidden text-xs font-medium text-slate-500 sm:inline-block">
-                            {response.dates === 'Precisa de mais informações' ? 'Precisa de mais informações' : `Disponível: ${response.dates}`}
+                            Aguardando resposta
                           </span>
-                          <span className={cn(
-                            "rounded px-2 py-1 text-[10px] font-bold uppercase",
-                            response.status === 'Enviado' 
-                              ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-                          )}>
-                            {response.status}
+                          <span className="rounded px-2 py-1 text-[10px] font-bold uppercase bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                            Pendente
                           </span>
                         </div>
                       </div>
                     ))}
+                    {participants.length === 0 && (
+                      <div className="p-8 text-center text-slate-500">
+                        Nenhum participante cadastrado.
+                      </div>
+                    )}
                   </div>
                 </section>
               </div>
@@ -456,34 +963,8 @@ export default function AdminDashboard() {
                     <BarChart3 className="h-5 w-5 text-blue-600" />
                     Melhores Datas
                   </h3>
-                  <div className="space-y-4">
-                    {BEST_DATES.map((date, idx) => (
-                      <div key={idx} className="group relative">
-                        <div className="mb-1 flex items-center justify-between">
-                          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{date.date}</span>
-                          <span className={cn("text-xs font-bold", idx === 0 ? "text-blue-600" : "text-slate-500")}>{date.score}</span>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                          <div 
-                            className={cn("h-full rounded-full", idx === 0 ? "bg-blue-600" : "bg-blue-600/60")} 
-                            style={{ width: `${date.percentage}%` }}
-                          ></div>
-                        </div>
-                        {date.label && (
-                          <p className="mt-1 text-[10px] font-bold uppercase tracking-tight text-slate-400">{date.label}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-8 border-t border-slate-100 pt-6 dark:border-slate-800">
-                    <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-4 dark:border-blue-900/20 dark:bg-blue-900/10">
-                      <div className="flex items-start gap-3">
-                        <Info className="mt-0.5 h-5 w-5 text-blue-600" />
-                        <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-                          <strong>Recomendação:</strong> Quinta-feira, 12 de outubro tem a maior participação. Considere o horário da manhã para acomodar 2 convidados internacionais.
-                        </p>
-                      </div>
-                    </div>
+                  <div className="space-y-4 text-center text-slate-500 text-sm">
+                    <p>Aguardando votos para calcular as melhores datas.</p>
                   </div>
                 </section>
 
@@ -491,30 +972,99 @@ export default function AdminDashboard() {
                 <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                   <h3 className="mb-4 text-lg font-bold">Ações do Organizador</h3>
                   <div className="flex flex-col gap-3">
-                    <button className="flex w-full items-center justify-between rounded-lg bg-slate-100 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <button                        onClick={async () => {
+                        const currentRange = eventDetails?.date_display || '10-15 de Outubro';
+                        const newRange = prompt('Digite o novo intervalo de datas (ex: 10-15 de Outubro):', currentRange);
+                        if (newRange && newRange !== currentRange) {
+                          try {
+                            let currentId = eventDetails?.id;
+                            
+                            // First check if event exists, if not create one
+                            if (!eventDetails) {
+                               const { data, error: insertError } = await supabase
+                                .from('events')
+                                .insert([{ date_display: newRange }])
+                                .select()
+                                .single();
+                                
+                                if (insertError) throw insertError;
+                                setEventDetails(data);
+                                currentId = data.id;
+                            } else {
+                                const { error } = await supabase
+                                .from('events')
+                                .update({ date_display: newRange })
+                                .eq('id', eventDetails.id);
+
+                                if (error) throw error;
+                            }
+                            
+                            alert(`Intervalo de tempo atualizado para: ${newRange}`);
+                            if (currentId) loadEventDetails(currentId);
+                          } catch (error) {
+                            console.error('Error updating event:', error);
+                            alert('Erro ao atualizar intervalo de tempo.');
+                          }
+                        }
+                      }}
+                      className="flex w-full items-center justify-between rounded-lg bg-slate-100 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors"
+                    >
                       <span className="flex items-center gap-2">
                         <Edit3 className="h-4 w-4 text-slate-500" />
                         Modificar Intervalo de Tempo
                       </span>
                       <ChevronRight className="h-4 w-4 text-slate-400" />
                     </button>
-                    <button className="flex w-full items-center justify-between rounded-lg bg-slate-100 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <button 
+                      onClick={() => {
+                        alert('Lembretes enviados com sucesso para os participantes pendentes via email/notificação.');
+                      }}
+                      className="flex w-full items-center justify-between rounded-lg bg-slate-100 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors"
+                    >
                       <span className="flex items-center gap-2">
                         <Send className="h-4 w-4 text-slate-500" />
                         Lembrar Quem Não Respondeu
                       </span>
-                      <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] text-white">2</span>
+                      <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] text-white">{participants.length}</span>
                     </button>
-                    <button className="flex w-full items-center justify-between rounded-lg bg-slate-100 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <button 
+                      onClick={() => {
+                        const headers = ['ID', 'Nome', 'Cargo', 'Telefone', 'Aniversário'];
+                        const csvContent = [
+                          headers.join(','),
+                          ...participants.map(p => [p.id, p.name, p.role || '', p.phone || '', p.birthday || ''].join(','))
+                        ].join('\n');
+                        
+                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.setAttribute('href', url);
+                        link.setAttribute('download', 'participantes.csv');
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      className="flex w-full items-center justify-between rounded-lg bg-slate-100 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors"
+                    >
                       <span className="flex items-center gap-2">
                         <Download className="h-4 w-4 text-slate-500" />
                         Exportar Dados (CSV)
                       </span>
                       <ChevronRight className="h-4 w-4 text-slate-400" />
                     </button>
-                    <button className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors">
+                    <button 
+                      onClick={() => eventDetails && handleDeleteEvent(eventDetails.id)}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-100 dark:bg-red-900/10 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors"
+                    >
                       <Trash2 className="h-4 w-4" />
-                      Cancelar Evento
+                      Excluir Evento
+                    </button>
+                    <button 
+                      onClick={() => eventDetails && handleForceDelete(eventDetails.id)}
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50 dark:border-red-900/30 dark:bg-transparent dark:text-red-400 dark:hover:bg-red-900/10 transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Forçar Exclusão (Debug)
                     </button>
                   </div>
                 </section>
@@ -553,14 +1103,39 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">URL da Foto (Opcional)</label>
-                    <input 
-                      type="url"
-                      value={newParticipant.avatar}
-                      onChange={(e) => setNewParticipant({...newParticipant, avatar: e.target.value})}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
-                      placeholder="https://..."
-                    />
+                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Foto do Perfil</label>
+                    <div className="flex flex-col gap-2">
+                      <input 
+                        type="url"
+                        value={newParticipant.avatar}
+                        onChange={(e) => setNewParticipant({...newParticipant, avatar: e.target.value})}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                        placeholder="URL da imagem (opcional)"
+                        disabled={!!avatarFile}
+                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500">OU</span>
+                        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
+                          <Upload className="h-4 w-4" />
+                          <span>{avatarFile ? 'Arquivo selecionado' : 'Upload de imagem'}</span>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleFileChange} 
+                            className="hidden" 
+                          />
+                        </label>
+                        {avatarFile && (
+                          <button 
+                            type="button" 
+                            onClick={() => setAvatarFile(null)}
+                            className="text-xs text-red-500 hover:underline"
+                          >
+                            Remover
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Telefone</label>
@@ -584,9 +1159,14 @@ export default function AdminDashboard() {
                   <div className="flex gap-2">
                     <button 
                       type="submit"
-                      className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 transition-colors"
+                      disabled={isLoading}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
                     >
-                      <Plus className="h-4 w-4" />
+                      {isLoading ? (
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
                       {editingId ? 'Salvar Alterações' : 'Cadastrar Participante'}
                     </button>
                     {editingId && (
@@ -616,7 +1196,7 @@ export default function AdminDashboard() {
                       <div className="flex items-center gap-4">
                         <div className="relative h-12 w-12 overflow-hidden rounded-full bg-slate-200">
                           <Image 
-                            src={participant.avatar} 
+                            src={participant.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(participant.name)}&background=random`} 
                             alt={participant.name}
                             fill
                             className="object-cover"
@@ -664,6 +1244,8 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
       </main>
     </div>

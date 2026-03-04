@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
@@ -15,22 +15,18 @@ import {
   Bell, 
   UserCircle,
   Lock,
-  RefreshCw
+  RefreshCw,
+  Settings
 } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-
-// Mock Data
-const PARTICIPANTS = [
-  { name: 'Sarah Miller', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBrIzCOC-vk45LVFIGwOTPeXiJ1zadI6AqXIfuipe4xcRlO1jfHvRFNt1Tyb0kqf_iee5mDUPQDpwmcTsv5K9R1VcH930AjOWirvEE-XGNKDChWB2Xv3u0w2TJN_6go7hedqTkRksIJHYejNlhpjDRUsWqY4b2wCBIhYENN_OyAtDf17h5u3q8G8j_UkEk076WP1aBUwSM1fTtywAoKfMn17ypKEb5M-_ux24JRww-0EmXgq2P4V0Y8BZCUTKToq1oD1t2NiCvJ8x31', status: 'votou' },
-  { name: 'David Chen', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAJ83TaUWfvJu7Dve1aV-2W9OtoQHFpqtEHn3gD_z_46zs-wRXLL9SzMChIToYqqiXdvx8_-b3gWehOHFRBBjxX_K0k2DbWdcTKPBErfbl0Yyn3CXEyHsMSleEq5iApOOm74KakikEq3aVUK1ILkPPZ7l9WHrJe4zBNV3fq_18tGWOfQrKTyySDuV9AV9kjEX5RXlvBQyJct6w5qGOmW590rXPpvJbC_dVt51sjfzVGBoZRdw_Q9jWlKKHLATzy-VuwEmBDqojHWyTH', status: 'votou' },
-  { name: 'Elena Rodriguez', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDXeGkOfTZjj5YeDBSxBSIh6Qk161TqY1KNp58RcZPJNVEY6LtdXSXmsvWnEg-S4WLkDfpwDNIMjU_aal6KYmOmiaAGCk4tcPAA0EqGzYqtiP3jhMq_4o-sLdTZQWV0Ghz_6xQXtnCpxu3D8P-ipFmFzCoiQ6tN0gD9Yfm4iYGq5h08v0Y2qsS-T9FshHP6XRO8HqRbDRLzc-oTwQtVuqSD5nwOHz6FvhbcXN6me1zYQF68XdTkv6jj1JJVrJHlkqjvLeCofQWbldmv', status: 'votou' },
-  { name: 'James Wilson', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBLiCvUBKwe59l9eEjE8E-BSQJF2MPn_PrBg5Pbd72LddxLWCHw6vIStvke9nuRKhYyBlTUFswfMUunpUfxJ5F_OyTg-ek8QAFoKihL3opZ3PWMcp7499aXDVV-n7gIPKCKDDc7Q0oNpLZzON3oeb8WS_9xSQyPfoUR1TRZqHfgjwoLkEfLw4gHvsN2P3EIFy95EPbeahH7CtF4jx0MZgybO-FBJK6MyFvB0GNjlwb9toIFz5EBqe0-nAWoXxC_npBNJ57PgSoOVydz', status: 'pendente' },
-];
+import { supabase } from '@/lib/supabase';
 
 export default function ParticipantView() {
-  const [currentUser, setCurrentUser] = useState<typeof PARTICIPANTS[0] | null>(null);
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+  const [eventDetails, setEventDetails] = useState<any>(null);
   const [currentDate, setCurrentDate] = useState(new Date(2023, 10, 1)); // November 2023
   const [selectedDates, setSelectedDates] = useState<Date[]>([
     new Date(2023, 10, 6),
@@ -39,6 +35,37 @@ export default function ParticipantView() {
     new Date(2023, 10, 14),
     new Date(2023, 10, 15),
   ]);
+
+  useEffect(() => {
+    const fetchParticipants = async () => {
+      const { data, error } = await supabase
+        .from('participants')
+        .select('*')
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching participants:', error);
+      } else {
+        setParticipants(data || []);
+      }
+    };
+
+    const fetchEventDetails = async () => {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .single();
+      
+      if (error) {
+        console.error('Error fetching event details:', error);
+      } else {
+        setEventDetails(data);
+      }
+    };
+
+    fetchParticipants();
+    fetchEventDetails();
+  }, []);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -70,21 +97,36 @@ export default function ParticipantView() {
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Quem é você? Selecione seu nome para continuar.</p>
           </div>
           <div className="space-y-3">
-            {PARTICIPANTS.map((participant) => (
+            {participants.map((participant) => (
               <button
-                key={participant.name}
+                key={participant.id}
                 onClick={() => setCurrentUser(participant)}
                 className="flex w-full items-center gap-4 rounded-xl border border-slate-200 p-4 transition-all hover:border-blue-600 hover:bg-blue-50 dark:border-slate-800 dark:hover:border-blue-600 dark:hover:bg-blue-900/20"
               >
                 <div className="relative h-10 w-10 overflow-hidden rounded-full bg-slate-100">
-                  <Image src={participant.avatar} alt={participant.name} fill className="object-cover" />
+                  <Image 
+                    src={participant.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(participant.name)}&background=random`} 
+                    alt={participant.name} 
+                    fill 
+                    className="object-cover" 
+                  />
                 </div>
                 <div className="text-left">
                   <p className="font-bold text-slate-900 dark:text-slate-100">{participant.name}</p>
-                  <p className="text-xs text-slate-500 capitalize">{participant.status}</p>
+                  <p className="text-xs text-slate-500 capitalize">{participant.role || 'Participante'}</p>
                 </div>
               </button>
             ))}
+            {participants.length === 0 && (
+              <p className="text-center text-sm text-slate-500">Nenhum participante encontrado.</p>
+            )}
+          </div>
+          
+          <div className="mt-8 flex justify-center border-t border-slate-100 pt-6 dark:border-slate-800">
+            <Link href="/admin" className="flex items-center gap-2 text-sm text-slate-400 hover:text-blue-600 transition-colors">
+              <Settings className="h-4 w-4" />
+              <span>Acessar Painel Administrativo</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -108,7 +150,12 @@ export default function ParticipantView() {
           <div className="flex gap-2 items-center">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300 mr-2">{currentUser.name}</span>
             <div className="relative h-9 w-9 overflow-hidden rounded-full bg-slate-100">
-               <Image src={currentUser.avatar} alt={currentUser.name} fill className="object-cover" />
+               <Image 
+                 src={currentUser.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&background=random`} 
+                 alt={currentUser.name} 
+                 fill 
+                 className="object-cover" 
+               />
             </div>
             <button 
               onClick={() => setCurrentUser(null)}
@@ -128,9 +175,9 @@ export default function ParticipantView() {
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="mb-6">
                 <span className="mb-2 inline-block rounded bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
-                  Reunião
+                  {eventDetails?.status === 'cancelled' ? 'Cancelado' : 'Reunião'}
                 </span>
-                <h2 className="text-2xl font-black leading-tight tracking-tight">Planejamento Estratégico Anual</h2>
+                <h2 className="text-2xl font-black leading-tight tracking-tight">{eventDetails?.title || 'Planejamento Estratégico Anual'}</h2>
                 <p className="mt-1 flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
                   <UserCircle className="h-4 w-4" /> Organizado por Sarah Miller
                 </p>
@@ -140,8 +187,13 @@ export default function ParticipantView() {
                 <div className="rounded-lg border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
                   <h3 className="mb-2 text-sm font-bold text-slate-900 dark:text-slate-100">Descrição</h3>
                   <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                    Finalizar metas do Q4 e visão para 2024. Precisamos alinhar os objetivos de todos os departamentos antes do final do mês.
+                    {eventDetails?.description || 'Finalizar metas do Q4 e visão para 2024. Precisamos alinhar os objetivos de todos os departamentos antes do final do mês.'}
                   </p>
+                  {eventDetails?.date_display && (
+                    <p className="mt-2 text-xs font-bold text-blue-600 dark:text-blue-400">
+                      Datas sugeridas: {eventDetails.date_display}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -151,12 +203,12 @@ export default function ParticipantView() {
                 Participantes (4/6 Votaram)
               </h3>
               <div className="space-y-4">
-                {PARTICIPANTS.map((participant) => (
-                  <div key={participant.name} className="flex items-center justify-between">
+                {participants.map((participant) => (
+                  <div key={participant.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="relative h-8 w-8 overflow-hidden rounded-full bg-slate-100">
                         <Image 
-                          src={participant.avatar} 
+                          src={participant.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(participant.name)}&background=random`} 
                           alt={participant.name}
                           fill
                           className="object-cover"
@@ -165,11 +217,8 @@ export default function ParticipantView() {
                       </div>
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{participant.name}</span>
                     </div>
-                    {participant.status === 'votou' ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <MoreHorizontal className="h-4 w-4 text-slate-300" />
-                    )}
+                    {/* Mock status for now as we don't have voting data yet */}
+                    <MoreHorizontal className="h-4 w-4 text-slate-300" />
                   </div>
                 ))}
               </div>
@@ -284,6 +333,10 @@ export default function ParticipantView() {
           <span className="flex items-center gap-1">
             <RefreshCw className="h-3 w-3" /> Sincronização automática ativada
           </span>
+          <Link href="/admin" className="ml-4 flex items-center gap-1 text-slate-400 hover:text-blue-600 dark:text-slate-600 dark:hover:text-blue-400 transition-colors">
+            <Settings className="h-3 w-3" />
+            <span>Admin</span>
+          </Link>
         </div>
       </footer>
     </div>
