@@ -629,7 +629,7 @@ export default function AdminDashboard() {
     .slice(0, 5);
 
   // Calculate consensus percentage
-  const consensus = totalParticipants > 0 ? Math.round((maxVotes / totalParticipants) * 100) : 0;
+  const consensus = votingParticipants > 0 ? Math.round((maxVotes / votingParticipants) * 100) : 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans">
@@ -1001,7 +1001,7 @@ export default function AdminDashboard() {
                         {Object.entries(dateCounts)
                           .sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime())
                           .map(([date, count]) => {
-                            const percentage = totalParticipants > 0 ? count / totalParticipants : 0;
+                            const percentage = votingParticipants > 0 ? count / votingParticipants : 0;
                             let bgClass = "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400";
                             if (percentage >= 1) bgClass = "bg-green-500 text-white";
                             else if (percentage >= 0.75) bgClass = "bg-green-400 text-white";
@@ -1112,7 +1112,7 @@ export default function AdminDashboard() {
                             <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                               <div 
                                 className="h-full bg-blue-600" 
-                                style={{ width: `${(count / totalParticipants) * 100}%` }}
+                                style={{ width: `${votingParticipants > 0 ? (count / votingParticipants) * 100 : 0}%` }}
                               ></div>
                             </div>
                             <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{count}</span>
