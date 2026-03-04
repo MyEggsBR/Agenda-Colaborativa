@@ -20,6 +20,7 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, en
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { getSystemConfig, defaultConfig } from '@/lib/systemConfig';
 
 export default function VotePage() {
   const params = useParams();
@@ -32,9 +33,16 @@ export default function VotePage() {
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [systemConfig, setSystemConfig] = useState(defaultConfig);
+  const [timestamp, setTimestamp] = useState<number | null>(null);
 
   useEffect(() => {
     const init = async () => {
+      setTimestamp(Date.now());
+      // 0. Fetch system config
+      const config = await getSystemConfig();
+      setSystemConfig(config);
+
       // 1. Check user login
       const storedUser = localStorage.getItem('syncup_user');
       if (!storedUser) {
@@ -165,7 +173,14 @@ export default function VotePage() {
           <Link href="/" className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100 hidden md:block">SyncUp</h1>
+          {systemConfig.logo_url && (
+             <div className="relative h-8 w-8 overflow-hidden rounded-full hidden md:block">
+               <Image src={`${systemConfig.logo_url}?t=${timestamp || ''}`} alt="Logo" fill className="object-cover" />
+             </div>
+          )}
+          <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100 hidden md:block">
+            {systemConfig.system_name}
+          </h1>
         </div>
         <div className="flex items-center gap-6">
           <div className="flex gap-2 items-center">

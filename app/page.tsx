@@ -23,9 +23,11 @@ export default function EventsListPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { config, loading: configLoading } = useSystemConfig();
+  const [timestamp, setTimestamp] = useState<number | null>(null);
 
   useEffect(() => {
     const init = async () => {
+      setTimestamp(Date.now());
       // 1. Check user login
       const storedUser = localStorage.getItem('syncup_user');
       if (!storedUser) {
@@ -72,7 +74,7 @@ export default function EventsListPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-900/20 relative overflow-hidden">
             {config.logo_url ? (
               <Image 
-                src={`${config.logo_url}?t=${Date.now()}`} 
+                src={`${config.logo_url}?t=${timestamp || ''}`} 
                 alt="Logo" 
                 fill 
                 className="object-contain p-1" 

@@ -16,9 +16,11 @@ export default function LoginPage() {
   const [newUserName, setNewUserName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const { config, loading: configLoading } = useSystemConfig();
+  const [timestamp, setTimestamp] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchParticipants = async () => {
+      setTimestamp(Date.now());
       const { data, error } = await supabase
         .from('participants')
         .select('*')
@@ -72,7 +74,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/20 overflow-hidden relative">
             {config.logo_url ? (
               <Image 
-                src={`${config.logo_url}?t=${Date.now()}`} 
+                src={`${config.logo_url}?t=${timestamp || ''}`} 
                 alt="Logo" 
                 fill 
                 className="object-contain p-2" 
