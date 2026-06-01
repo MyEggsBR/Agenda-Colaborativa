@@ -35,6 +35,8 @@ export default function VotePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [systemConfig, setSystemConfig] = useState(defaultConfig);
   const [timestamp, setTimestamp] = useState<number | null>(null);
+  const [allVotes, setAllVotes] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<any[]>([]);
 
   useEffect(() => {
     const init = async () => {
@@ -68,6 +70,25 @@ export default function VotePage() {
         if (data.start_date) {
             setCurrentDate(new Date(data.start_date));
         }
+
+        // Fetch all votes for this event
+        const { data: allVotesData, error: allVotesError } = await supabase
+          .from('votes')
+          .select('*')
+          .eq('event_id', eventId);
+        
+        if (!allVotesError && allVotesData) {
+          setAllVotes(allVotesData);
+        }
+
+        // Fetch participants
+        const { data: participantsData, error: participantsError } = await supabase
+          .from('participants')
+          .select('*');
+        
+        if (!participantsError && participantsData) {
+          setParticipants(participantsData);
+        }
       }
       setIsLoading(false);
     };
@@ -95,6 +116,19 @@ export default function VotePage() {
 
     fetchVotes();
   }, [currentUser, eventDetails, eventId]);
+
+  // Calculate date popularity across all votes
+  const dateCounts: Record<string, number> = {};
+  allVotes.forEach(vote => {
+    const date = vote.date;
+    dateCounts[date] = (dateCounts[date] || 0) + 1;
+  });
+
+  const votingParticipantsCount = new Set(allVotes.map(v => v.user_id)).size;
+
+  const sortedDates = Object.entries(dateCounts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -228,11 +262,67 @@ export default function VotePage() {
               </div>
             </div>
 
-            {/* PRIVACY: Removed participants list from public view as requested */}
+            {/* MOST VOTED DATES / LEADERBOARD */}
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                Datas Mais Votadas Atualmente
+              </h3>
+              <div className="space-y-4">
+                {sortedDates.length > 0 ? (
+                  sortedDates.map(([date, count], index) => {
+                    const totalParticipantsCount = participants.length || 1;
+                    const percent = Math.round((count / totalParticipantsCount) * 100);
+                    return (
+                      <div key={date} className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black",
+                              index === 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400" :
+                              index === 1 ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" :
+                              "bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400"
+                            )}>
+                              {index + 1}
+                            </span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300 capitalize">
+                              {new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', weekday: 'short' })}
+                            </span>
+                          </div>
+                          <span className="font-bold text-slate-900 dark:text-slate-100">
+                            {count} {count === 1 ? 'voto' : 'votos'} ({percent}%)
+                          </span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                          <div 
+                            className="h-full bg-emerald-500 transition-all duration-500" 
+                            style={{ width: `${percent}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-4 text-xs text-slate-500">
+                    Nenhum voto cadastrado ainda.<br />Seja o primeiro a selecionar datas e salvar!
+                  </div>
+                )}
+                {votingParticipantsCount > 0 && (
+                  <div className="border-t border-slate-100 pt-3 dark:border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+                    <span>Participação atual:</span>
+                    <span className="font-semibold text-slate-600 dark:text-slate-300">
+                      {votingParticipantsCount} de {participants.length} pessoas votaram
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* PRIVACY: Updated text acknowledging aggregate visibility */}
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2">Privacidade</h3>
-                <p className="text-xs text-slate-500">
-                    Seus votos são confidenciais e visíveis apenas para o organizador.
+                <p className="text-xs text-slate-500 leading-relaxed">
+                    Os votos agregados por data são visíveis para todos os participantes, mas a escolha individual de cada pessoa permanece confidencial e visível apenas para o organizador.
                 </p>
             </div>
           </aside>
@@ -293,6 +383,8 @@ export default function VotePage() {
                   const isSelected = selectedDates.some(d => isSameDay(d, day));
                   const isCurrentMonth = isSameMonth(day, currentDate);
                   const isTodayDate = isToday(day);
+                  const dateStr = format(day, 'yyyy-MM-dd');
+                  const dayVoteCount = dateCounts[dateStr] || 0;
 
                   return (
                     <button
@@ -300,19 +392,29 @@ export default function VotePage() {
                       onClick={() => toggleDate(day)}
                       disabled={!isCurrentMonth || eventDetails.status === 'closed'}
                       className={cn(
-                        "group relative h-14 w-full md:h-16",
+                        "group relative h-16 w-full",
                         !isCurrentMonth && "opacity-0 pointer-events-none",
                         isCurrentMonth && eventDetails.status === 'closed' && "opacity-50 cursor-not-allowed"
                       )}
                     >
                       <div className={cn(
-                        "flex h-full w-full items-center justify-center rounded-xl border transition-all text-sm font-medium",
+                        "flex flex-col h-full w-full items-center justify-center rounded-xl border transition-all text-sm font-medium py-1",
                         isSelected 
                           ? "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-600/20 font-bold" 
-                          : "border-transparent bg-slate-50 text-slate-400 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 dark:bg-slate-800/50 dark:hover:bg-blue-900/20 dark:hover:border-blue-800",
+                          : "border-transparent bg-slate-50 text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 dark:bg-slate-800/50 dark:hover:bg-blue-900/20 dark:hover:border-blue-800",
                         isTodayDate && !isSelected && "border-slate-300 dark:border-slate-600"
                       )}>
-                        {format(day, 'd')}
+                        <span className="text-sm font-bold">{format(day, 'd')}</span>
+                        {dayVoteCount > 0 && (
+                          <span className={cn(
+                            "text-[9px] font-black px-1.5 py-0.5 rounded-full mt-1 tracking-tight",
+                            isSelected
+                              ? "bg-blue-500 text-white"
+                              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                          )}>
+                            {dayVoteCount} {dayVoteCount === 1 ? 'voto' : 'votos'}
+                          </span>
+                        )}
                       </div>
                     </button>
                   );
